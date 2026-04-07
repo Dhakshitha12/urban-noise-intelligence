@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Urban Noise Intelligence Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Include SweetAlert2 for beautiful alerts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <div class="navbar">
+        <h2>Urban Noise Intelligence</h2>
+        <nav>
+            <button class="btn btn-secondary btn-sm" onclick="toggleMode()">Toggle Theme</button>
+        </nav>
+    </div>
+
+    <div class="container animate-fade-in">
+        <div class="auth-container">
+            <div class="card">
+                <h2>Welcome Back</h2>
+                <p class="mb-4" style="color: var(--text-muted)">Login to your account to monitor urban noise metrics.</p>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="name@example.com" autocomplete="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+                </div>
+
+                <button class="btn btn-block mt-2" onclick="login()">Sign In</button>
+
+                <p class="mt-4" style="font-size: 0.9rem; color: var(--text-muted);">
+                    Don't have an account? <a href="signup.html" style="color: var(--primary); text-decoration: none; font-weight: 500;">Create one</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

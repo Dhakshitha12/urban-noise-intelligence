@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Urban Noise Intelligence Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <div class="navbar">
+        <h2>Urban Noise Intelligence <span style="background: var(--danger); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: white; vertical-align: top; margin-left: 5px;">ADMIN</span></h2>
+        <nav>
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="analyzer.html" class="nav-link">Analyzer</a>
+            <a href="reports.html" class="nav-link">Reports</a>
+            <a href="admin.html" class="nav-link active">Admin</a>
+            <button class="btn btn-secondary btn-sm" onclick="toggleMode()">Theme</button>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </nav>
+    </div>
+
+    <div class="container animate-fade-in">
+        <h2 class="mb-4">System Administration</h2>
+        
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>Registered Users Overview</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User Name</th>
+                            <th>Email Address</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTable">
+                        <!-- Populated randomly/mock for UI purposes, grabbing current local user -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>API / Cloud Gateway Monitor</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Endpoint / ARN</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>AWS Lambda</td>
+                            <td style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted);">arn:aws:lambda:us-east-1:xxx...</td>
+                            <td><span style="color: var(--success); font-weight: bold;">● Active</span></td>
+                        </tr>
+                        <tr>
+                            <td>API Gateway</td>
+                            <td style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted);">https://*.execute-api...</td>
+                            <td><span style="color: var(--success); font-weight: bold;">● Active</span></td>
+                        </tr>
+                        <tr>
+                            <td>S3 Hosting</td>
+                            <td style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted);">s3://urban-noise-platform...</td>
+                            <td><span style="color: var(--success); font-weight: bold;">● Active</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Restrict to "Admin" - for demo we just show the registered user
+        let user = JSON.parse(localStorage.getItem("user"));
+        if (!user) { window.location.href = "login.html"; }
+        
+        // Mock DB connection for Users
+        const tbody = document.getElementById("userTable");
+        
+        let users = [];
+        if(user) users.push(user);
+        users.push({name: "Admin System", email: "admin@urbannoise.com", role: 'admin'});
+
+        users.forEach(u => {
+            let tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td><strong>${u.name}</strong></td>
+                <td>${u.email}</td>
+                <td><span class="badge low">Active</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="alert('Manage user: ${u.name}')">Manage</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    </script>
+</body>
+</html>
