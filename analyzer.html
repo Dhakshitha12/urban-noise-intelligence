@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyzer - Urban Noise Intelligence Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <div class="navbar">
+        <h2>Urban Noise Intelligence</h2>
+        <nav>
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="analyzer.html" class="nav-link active">Analyzer</a>
+            <a href="reports.html" class="nav-link">Reports</a>
+            <a href="admin.html" class="nav-link">Admin</a>
+            <button class="btn btn-secondary btn-sm" onclick="toggleMode()">Theme</button>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </nav>
+    </div>
+
+    <div class="container animate-fade-in">
+        <h2 class="mb-4">Noise Analyzer</h2>
+        
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <p style="color: var(--text-muted); margin-bottom: 24px;">
+                Upload a sample audio or manually enter the amplitude to calculate the ambient decibel level using our Cloud AI engines.
+            </p>
+
+            <div class="file-drop-area mb-4">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 15px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <div style="font-weight: 500; font-size: 1.1rem; color: var(--text-main);">Drag & Drop Audio File</div>
+                <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">or click to browse (.mp3, .wav)</div>
+            </div>
+
+            <div class="text-center mb-4" style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;">
+                --- or enter manually ---
+            </div>
+
+            <div class="form-group">
+                <label for="amplitude">Audio Amplitude Signal</label>
+                <input type="number" id="amplitude" placeholder="e.g. 15000">
+            </div>
+
+            <button class="btn btn-block" onclick="analyzeNoise()" id="analyzeBtn">Analyze Cloud Data</button>
+
+            <div id="result" class="mt-4" style="display: none; padding: 20px; border-radius: 8px; background: rgba(37,99,235,0.05); border: 1px solid rgba(37,99,235,0.2);">
+                <h3 style="margin-bottom: 10px;">Analysis Result</h3>
+                <div style="font-size: 1.2rem; font-weight: 600;">Decibel: <span id="resDb" style="color: var(--primary);"></span></div>
+                <div style="font-size: 1.1rem; margin-top: 5px;">Category: <span id="resType" class="badge"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Check Auth
+        if (!localStorage.getItem("user")) {
+            window.location.href = "login.html";
+        }
+
+        async function analyzeNoise() {
+            const amplitude = document.getElementById("amplitude").value;
+            if(!amplitude){
+                Swal.fire({icon: 'error', title: 'Oops...', text: 'Please enter an amplitude'});
+                return;
+            }
+
+            const btn = document.getElementById("analyzeBtn");
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loader" style="width: 16px; height: 16px; border-width: 2px; margin-right: 8px; vertical-align: middle;"></span> Analyzing...';
+            btn.disabled = true;
+
+            try {
+                // In a real environment, this URL points to the actual API Gateway. 
+                // Placeholder here until deployment. It will be patched by standard DOM tools if needed or it points to API GW.
+                // We will simulate locally if API GW is not ready, then actually fetch.
+                
+                // For demo safety if the URL isn't configured yet, fallback:
+                let result = {};
+                
+                try {
+                    const API_URL = "/analyze-noise";
+                    const response = await fetch(API_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ amplitude: parseInt(amplitude) })
+                    });
+                    const data = await response.json();
+                    result = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+                } catch(neterror) {
+                    console.log("Using Local Simulation since API is not fully reachable yet.");
+                    let val = parseInt(amplitude);
+                    let db = 20 * Math.log10(val);
+                    let type = db > 80 ? "High Noise" : (db > 50 ? "Moderate Noise" : "Low Noise");
+                    result = { decibel: db.toFixed(2), noise_type: type };
+                }
+
+                // Show result
+                const resDiv = document.getElementById("result");
+                resDiv.style.display = "block";
+                document.getElementById("resDb").innerText = result.decibel + " dB";
+                
+                const typeBadge = document.getElementById("resType");
+                typeBadge.innerText = result.noise_type;
+                
+                if(result.noise_type === "High Noise") typeBadge.className = "badge high";
+                else if(result.noise_type === "Moderate Noise") typeBadge.className = "badge moderate";
+                else typeBadge.className = "badge low";
+
+                // Save to local storage for reports
+                let history = JSON.parse(localStorage.getItem("noiseHistory")) || [];
+                const date = new Date();
+                history.push({
+                    date: date.toLocaleString(),
+                    level: result.decibel,
+                    type: result.noise_type,
+                    lat: (40.7128 + (Math.random() * 0.05 - 0.025)).toFixed(4), // Simulated NY Coords
+                    lng: (-74.0060 + (Math.random() * 0.05 - 0.025)).toFixed(4)
+                });
+                localStorage.setItem("noiseHistory", JSON.stringify(history));
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Analysis Complete',
+                    text: 'Results saved to reports.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+            } catch (error) {
+                Swal.fire({icon: 'error', title: 'Error', text: 'Error connecting to Cloud API'});
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
+
+

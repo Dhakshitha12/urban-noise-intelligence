@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - Urban Noise Intelligence Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Leaflet Setup for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div class="navbar">
+        <h2>Urban Noise Intelligence</h2>
+        <nav>
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="analyzer.html" class="nav-link">Analyzer</a>
+            <a href="reports.html" class="nav-link active">Reports</a>
+            <a href="admin.html" class="nav-link">Admin</a>
+            <button class="btn btn-secondary btn-sm" onclick="toggleMode()">Theme</button>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </nav>
+    </div>
+
+    <div class="container animate-fade-in">
+        <div class="flex-between mb-4">
+            <h2>Noise Intelligence Reports</h2>
+            <button class="btn" onclick="exportPDF()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export as PDF
+            </button>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card" style="grid-column: span 1;">
+                <h3>Live Hotspot Map</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">Monitoring recorded noise geolocations.</p>
+                <div id="map"></div>
+            </div>
+
+            <div class="card" style="grid-column: span 1;">
+                <h3>Historical Noise Data</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">Locally stored intelligence data from Cloud analyzers.</p>
+                
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table id="reportsTable">
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Level (dB)</th>
+                                <th>Category</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportsBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Check Auth
+        if (!localStorage.getItem("user")) { window.location.href = "login.html"; }
+
+        // Initialize Map
+        const map = L.map('map').setView([40.7128, -74.0060], 12); // Def NY
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        // Load data
+        let history = JSON.parse(localStorage.getItem("noiseHistory")) || [];
+        const tbody = document.getElementById("reportsBody");
+
+        if (history.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center" style="color: var(--text-muted);">No records found. Visit analyzer to add data.</td></tr>`;
+        } else {
+            // Plot on Map & Table
+            history.reverse().forEach(record => {
+                // Table
+                let tr = document.createElement("tr");
+                let badgeClass = record.type === "High Noise" ? "badge high" : (record.type === "Moderate Noise" ? "badge moderate" : "badge low");
+                
+                tr.innerHTML = `
+                    <td style="font-size: 0.9rem;">${record.date}</td>
+                    <td style="font-weight: 600;">${record.level}</td>
+                    <td><span class="${badgeClass}">${record.type}</span></td>
+                `;
+                tbody.appendChild(tr);
+
+                // Map marker
+                if (record.lat && record.lng) {
+                    let color = record.type === "High Noise" ? "red" : (record.type === "Moderate Noise" ? "orange" : "green");
+                    L.circleMarker([record.lat, record.lng], {
+                        radius: 8,
+                        fillColor: color,
+                        color: "#fff",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map).bindPopup(`<b>${record.level} dB</b><br>${record.type}`);
+                }
+            });
+            
+            // Re-reverse for map fitting
+            history.reverse();
+        }
+
+        // Export PDF
+        function exportPDF() {
+            if(history.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(20);
+            doc.text("Urban Noise Intelligence Report", 14, 22);
+            doc.setFontSize(11);
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+            
+            let tableData = history.map(row => [row.date, row.level + " dB", row.type]);
+
+            doc.autoTable({
+                startY: 40,
+                head: [['Date', 'Noise Level', 'Category']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillColor: [37, 99, 235] }
+            });
+
+            doc.save('Urban_Noise_Report.pdf');
+        }
+    </script>
+</body>
+</html>

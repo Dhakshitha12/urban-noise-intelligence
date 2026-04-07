@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Urban Noise Intelligence Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <div class="navbar">
+        <h2>Urban Noise Intelligence</h2>
+        <nav>
+            <a href="dashboard.html" class="nav-link active">Dashboard</a>
+            <a href="analyzer.html" class="nav-link">Analyzer</a>
+            <a href="reports.html" class="nav-link">Reports</a>
+            <a href="admin.html" class="nav-link">Admin</a>
+            <button class="btn btn-secondary btn-sm" onclick="toggleMode()">Theme</button>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </nav>
+    </div>
+
+    <div class="container animate-fade-in">
+        <div class="flex-between mb-4">
+            <div>
+                <h2>Dashboard Overview</h2>
+                <p style="color: var(--text-muted)">Welcome back, <span id="userNameDisplay">User</span>!</p>
+            </div>
+            <button class="btn" onclick="refreshData()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+                Refresh Data
+            </button>
+        </div>
+
+        <div class="dashboard-grid mb-4">
+            <!-- Widgets -->
+            <div class="card metric-card interactive" onclick="location.href='analyzer.html'" style="cursor: pointer;">
+                <h3>Analyze Audio</h3>
+                <div class="value" style="font-size: 1.5rem;">Upload & Analyze</div>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">Calculate decibel values via Cloud API.</p>
+            </div>
+
+            <div class="card metric-card">
+                <h3>Live Average Noise</h3>
+                <div class="value" id="liveNoise">-- dB</div>
+                <div class="badge moderate" id="liveBadge">Normal</div>
+            </div>
+
+            <div class="card metric-card">
+                <h3>Predicted Peak</h3>
+                <div class="value" id="prediction">-- dB</div>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">Forecast for next 4 hours</p>
+            </div>
+            
+            <div class="card metric-card">
+                <h3>System Alerts</h3>
+                <div class="value" style="font-size: 1.5rem;" id="alertBox">No Alerts</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card" style="grid-column: span 2;">
+                <h3>Real-Time Noise Level Analytics</h3>
+                <div style="height: 300px; margin-top: 20px;">
+                    <canvas id="noiseChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Sensor Simulation</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sensor</th>
+                            <th>Status</th>
+                            <th>Noise</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Alpha (Park)</td>
+                            <td><span style="color: var(--success)">● Online</span></td>
+                            <td id="sensorA">--</td>
+                        </tr>
+                        <tr>
+                            <td>Beta (Highway)</td>
+                            <td><span style="color: var(--success)">● Online</span></td>
+                            <td id="sensorB">--</td>
+                        </tr>
+                        <tr>
+                            <td>Gamma (Market)</td>
+                            <td><span style="color: var(--success)">● Online</span></td>
+                            <td id="sensorC">--</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Init User
+        const storedUser = JSON.parse(localStorage.getItem("user"));
+        if (storedUser && storedUser.name) {
+            document.getElementById("userNameDisplay").textContent = storedUser.name;
+        }
+
+        // Chart.js init
+        const ctx = document.getElementById("noiseChart");
+        
+        Chart.defaults.color = 'hsl(215, 16%, 47%)';
+        Chart.defaults.font.family = 'Inter';
+
+        let noiseChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: ["8:00 AM", "12:00 PM", "4:00 PM", "8:00 PM", "12:00 AM"],
+                datasets: [{
+                    label: "Avg City Noise (dB)",
+                    data: [45, 68, 75, 55, 40],
+                    borderColor: "hsl(221, 83%, 53%)",
+                    backgroundColor: "hsla(221, 83%, 53%, 0.1)",
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, suggestedMax: 100 }
+                }
+            }
+        });
+
+        function refreshData() {
+            let newData = Array.from({length: 5}, () => Math.floor(Math.random() * 50) + 30);
+            noiseChart.data.datasets[0].data = newData;
+            noiseChart.update();
+        }
+
+        /* -------- REAL TIME NOISE SIMULATION -------- */
+        setInterval(function() {
+            let noise = Math.floor(Math.random() * 60) + 30; // 30-90
+            document.getElementById("liveNoise").innerHTML = noise + " dB";
+            
+            const badge = document.getElementById("liveBadge");
+            if(noise > 70) {
+                badge.className = "badge high";
+                badge.textContent = "High";
+                document.getElementById("alertBox").innerHTML = `<span style="color: var(--danger)">⚠ Alert: ${noise}dB in Downtown</span>`;
+            } else if (noise > 50) {
+                badge.className = "badge moderate";
+                badge.textContent = "Moderate";
+                document.getElementById("alertBox").innerHTML = "Monitoring Stable";
+            } else {
+                badge.className = "badge low";
+                badge.textContent = "Low";
+                document.getElementById("alertBox").innerHTML = "No Alerts";
+            }
+
+            document.getElementById("prediction").innerHTML = (noise + Math.floor(Math.random() * 15)) + " dB";
+        }, 4000);
+
+        /* -------- SENSOR SIMULATION -------- */
+        setInterval(function() {
+            document.getElementById("sensorA").innerHTML = (Math.floor(Math.random() * 30) + 30) + " dB";
+            document.getElementById("sensorB").innerHTML = (Math.floor(Math.random() * 40) + 60) + " dB";
+            document.getElementById("sensorC").innerHTML = (Math.floor(Math.random() * 30) + 50) + " dB";
+        }, 3000);
+    </script>
+</body>
+</html>
