@@ -1,5 +1,5 @@
 import json
-import math
+from noise_library import AmbientNoiseAnalyzer
 
 def lambda_handler(event, context):
     try:
@@ -18,22 +18,11 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': 'Invalid amplitude provided. Must be a positive number.'})
             }
 
-        # Calculate decibel using the standard formula
-        decibel = 20 * math.log10(amplitude)
-
-        # Classify Noise
-        if decibel > 80:
-            noise_type = "High Noise"
-        elif decibel > 50:
-            noise_type = "Moderate Noise"
-        else:
-            noise_type = "Low Noise"
-
-        # Prepare HTTP Response with CORS headers
-        response_body = {
-            'decibel': round(decibel, 2),
-            'noise_type': noise_type
-        }
+        # Instantiate our custom Object-Oriented Library
+        noise_engine = AmbientNoiseAnalyzer(amplitude)
+        
+        # Utilize the library to generate the intelligent report
+        response_body = noise_engine.get_full_report()
 
         return {
             'statusCode': 200,

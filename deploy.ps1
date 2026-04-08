@@ -45,8 +45,8 @@ $roleArn = $roleResult.Role.Arn
 Write-Host "Successfully secured LabRole ARN: $roleArn"
 
 # 3. Deploy Lambda
-Write-Host "`n[3/5] Deploying Lambda Function..."
-Compress-Archive -Path .\backend\lambda_function.py -DestinationPath .\backend\lambda_function.zip -Force
+Write-Host "`n[3/5] Deploying Lambda Function (Including OOP Engine)..."
+Compress-Archive -Path .\backend\lambda_function.py, .\backend\noise_library.py -DestinationPath .\backend\lambda_function.zip -Force
 $lambdaResultRaw = aws lambda create-function --function-name $LAMBDA_NAME --runtime python3.9 --role $roleArn --handler lambda_function.lambda_handler --zip-file "fileb://backend/lambda_function.zip" --no-cli-pager
 $lambdaResult = $lambdaResultRaw | ConvertFrom-Json
 $lambdaArn = $lambdaResult.FunctionArn
