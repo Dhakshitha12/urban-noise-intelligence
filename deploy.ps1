@@ -1,15 +1,21 @@
-# deploy.ps1 - Deployment Script for Urban Noise Intelligence Platform (Fixed Pager)
+# deploy.ps1 - Deployment Script for Urban Noise Intelligence Platform (SNS Edition)
 
 # Settings
 $AWS_REGION = "us-east-1"
 $RANDOM_SUFFIX = Get-Random -Maximum 9999
 $BUCKET_NAME = "urban-noise-platform-app-2026-$RANDOM_SUFFIX"
 $LAMBDA_NAME = "urban-noise-analyzer-$RANDOM_SUFFIX"
+$SNS_EMAIL = "admin@example.com"
 
 Write-Host "============================"
-Write-Host "Deploying Urban Noise Platform (Pass 3)"
+Write-Host "Deploying Urban Noise Platform (With SNS)"
 Write-Host "============================"
-Write-Host "Target S3 Bucket: $BUCKET_NAME"
+
+# Fetch standard Academy Account details
+$callerId = aws sts get-caller-identity --no-cli-pager | ConvertFrom-Json
+$accountId = $callerId.Account
+$roleArn = "arn:aws:iam::" + $accountId + ":role/LabRole"
+Write-Host "Utilizing Student Academy LabRole: $roleArn"
 
 # 1. S3 Deployment 
 Write-Host "`n[1/5] Setting up S3 Bucket for Static Website Hosting..."
@@ -37,17 +43,20 @@ Remove-Item policy.json
 aws s3 website "s3://$BUCKET_NAME" --index-document login.html --no-cli-pager
 aws s3 sync .\frontend\ "s3://$BUCKET_NAME" --no-cli-pager
 
-# 2. IAM Query 
-Write-Host "`n[2/5] Programmatically Fetching AWS Academy LabRole via IAM..."
-$roleResultRaw = aws iam get-role --role-name LabRole --no-cli-pager
-$roleResult = $roleResultRaw | ConvertFrom-Json
-$roleArn = $roleResult.Role.Arn
-Write-Host "Successfully secured LabRole ARN: $roleArn"
+# 2. Amazon SNS Deployment
+Write-Host "`n[2/5] Deploying Amazon SNS Topic for High Noise Alerts..."
+$snsTopicRaw = aws sns create-topic --name "UrbanNoiseAlerts-$RANDOM_SUFFIX" --no-cli-pager
+$snsTopic = $snsTopicRaw | ConvertFrom-Json
+$snsTopicArn = $snsTopic.TopicArn
+Write-Host "SNS Topic Created: $snsTopicArn"
+
+aws sns subscribe --topic-arn $snsTopicArn --protocol email --notification-endpoint $SNS_EMAIL --no-cli-pager
+Write-Host "Subscription successfully issued to $SNS_EMAIL!"
 
 # 3. Deploy Lambda
 Write-Host "`n[3/5] Deploying Lambda Function (Including OOP Engine)..."
 Compress-Archive -Path .\backend\lambda_function.py, .\backend\noise_library.py -DestinationPath .\backend\lambda_function.zip -Force
-$lambdaResultRaw = aws lambda create-function --function-name $LAMBDA_NAME --runtime python3.9 --role $roleArn --handler lambda_function.lambda_handler --zip-file "fileb://backend/lambda_function.zip" --no-cli-pager
+$lambdaResultRaw = aws lambda create-function --function-name $LAMBDA_NAME --runtime python3.9 --role $roleArn --handler lambda_function.lambda_handler --zip-file "fileb://backend/lambda_function.zip" --environment "Variables={SNS_TOPIC_ARN=$snsTopicArn}" --no-cli-pager
 $lambdaResult = $lambdaResultRaw | ConvertFrom-Json
 $lambdaArn = $lambdaResult.FunctionArn
 
@@ -72,7 +81,6 @@ Write-Host "New API Gateway URL: $fullApiUrl"
 
 $analyzerPath = ".\frontend\analyzer.html"
 $analyzerHtml = Get-Content $analyzerPath -Raw
-# Handle previous regex replacements just in case
 $analyzerHtml = $analyzerHtml -replace 'https://placeholder\.execute-api\.us-east-1\.amazonaws\.com/analyze-noise', $fullApiUrl
 $analyzerHtml = $analyzerHtml -replace 'https://[a-zA-Z0-9-]+\.execute-api\.us-east-1\.amazonaws\.com/analyze-noise', $fullApiUrl
 Set-Content -Path $analyzerPath -Value $analyzerHtml
