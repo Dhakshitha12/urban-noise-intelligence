@@ -1,11 +1,16 @@
 import json
 import os
 import boto3
+import uuid
+import datetime
 from noise_library import AmbientNoiseAnalyzer
 
-# Initialize SNS client
+# Initialize Cloud Clients
 sns_client = boto3.client('sns')
+dynamodb = boto3.resource('dynamodb')
+
 SNS_TOPIC_ARN = os.environ.get('SNS_TOPIC_ARN')
+DYNAMODB_TABLE_NAME = os.environ.get('DYNAMODB_TABLE_NAME')
 
 def lambda_handler(event, context):
     try:
@@ -40,6 +45,22 @@ def lambda_handler(event, context):
                 )
             except Exception as sns_error:
                 print("SNS Publish failed:", sns_error)
+
+        # DynamoDB Service Logic - Permanently log the analysis
+        if DYNAMODB_TABLE_NAME:
+            try:
+                table = dynamodb.Table(DYNAMODB_TABLE_NAME)
+                table.put_item(
+                    Item={
+                        'RecordId': str(uuid.uuid4()),
+                        'Timestamp': datetime.datetime.utcnow().isoformat(),
+                        'Amplitude': amplitude,
+                        'Decibel': str(response_body['decibel']),
+                        'Classification': response_body['noise_type']
+                    }
+                )
+            except Exception as db_error:
+                print("DynamoDB save failed:", db_error)
 
         return {
             'statusCode': 200,

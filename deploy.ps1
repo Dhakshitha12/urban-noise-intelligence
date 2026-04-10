@@ -1,14 +1,15 @@
-# deploy.ps1 - Deployment Script for Urban Noise Intelligence Platform (SNS Edition)
+# deploy.ps1 - Deployment Script for Urban Noise Intelligence Platform (SNS & DynamoDB Edition)
 
 # Settings
 $AWS_REGION = "us-east-1"
 $RANDOM_SUFFIX = Get-Random -Maximum 9999
 $BUCKET_NAME = "urban-noise-platform-app-2026-$RANDOM_SUFFIX"
 $LAMBDA_NAME = "urban-noise-analyzer-$RANDOM_SUFFIX"
+$DYNAMO_TABLE_NAME = "UrbanNoiseHistory-$RANDOM_SUFFIX"
 $SNS_EMAIL = "admin@example.com"
 
 Write-Host "============================"
-Write-Host "Deploying Urban Noise Platform (With SNS)"
+Write-Host "Deploying Urban Noise Platform (6 Services Edition)"
 Write-Host "============================"
 
 # Fetch standard Academy Account details
@@ -18,7 +19,7 @@ $roleArn = "arn:aws:iam::" + $accountId + ":role/LabRole"
 Write-Host "Utilizing Student Academy LabRole: $roleArn"
 
 # 1. S3 Deployment 
-Write-Host "`n[1/5] Setting up S3 Bucket for Static Website Hosting..."
+Write-Host "`n[1/6] Setting up S3 Bucket for Static Website Hosting..."
 aws s3 mb "s3://$BUCKET_NAME" --region $AWS_REGION --no-cli-pager
 
 $s3Policy = @"
@@ -44,7 +45,7 @@ aws s3 website "s3://$BUCKET_NAME" --index-document login.html --no-cli-pager
 aws s3 sync .\frontend\ "s3://$BUCKET_NAME" --no-cli-pager
 
 # 2. Amazon SNS Deployment
-Write-Host "`n[2/5] Deploying Amazon SNS Topic for High Noise Alerts..."
+Write-Host "`n[2/6] Deploying Amazon SNS Topic for High Noise Alerts..."
 $snsTopicRaw = aws sns create-topic --name "UrbanNoiseAlerts-$RANDOM_SUFFIX" --no-cli-pager
 $snsTopic = $snsTopicRaw | ConvertFrom-Json
 $snsTopicArn = $snsTopic.TopicArn
@@ -53,15 +54,20 @@ Write-Host "SNS Topic Created: $snsTopicArn"
 aws sns subscribe --topic-arn $snsTopicArn --protocol email --notification-endpoint $SNS_EMAIL --no-cli-pager
 Write-Host "Subscription successfully issued to $SNS_EMAIL!"
 
-# 3. Deploy Lambda
-Write-Host "`n[3/5] Deploying Lambda Function (Including OOP Engine)..."
+# 3. Amazon DynamoDB Deployment
+Write-Host "`n[3/6] Deploying Amazon DynamoDB for Noise Reporting..."
+aws dynamodb create-table --table-name $DYNAMO_TABLE_NAME --attribute-definitions AttributeName=RecordId,AttributeType=S --key-schema AttributeName=RecordId,KeyType=HASH --billing-mode PAY_PER_REQUEST --no-cli-pager
+Write-Host "DynamoDB Table provisioning initiated: $DYNAMO_TABLE_NAME"
+
+# 4. Deploy Lambda
+Write-Host "`n[4/6] Deploying Lambda Function (Including OOP Engine)..."
 Compress-Archive -Path .\backend\lambda_function.py, .\backend\noise_library.py -DestinationPath .\backend\lambda_function.zip -Force
-$lambdaResultRaw = aws lambda create-function --function-name $LAMBDA_NAME --runtime python3.9 --role $roleArn --handler lambda_function.lambda_handler --zip-file "fileb://backend/lambda_function.zip" --environment "Variables={SNS_TOPIC_ARN=$snsTopicArn}" --no-cli-pager
+$lambdaResultRaw = aws lambda create-function --function-name $LAMBDA_NAME --runtime python3.9 --role $roleArn --handler lambda_function.lambda_handler --zip-file "fileb://backend/lambda_function.zip" --environment "Variables={SNS_TOPIC_ARN=$snsTopicArn,DYNAMODB_TABLE_NAME=$DYNAMO_TABLE_NAME}" --no-cli-pager
 $lambdaResult = $lambdaResultRaw | ConvertFrom-Json
 $lambdaArn = $lambdaResult.FunctionArn
 
-# 4. API Gateway Setup
-Write-Host "`n[4/5] Setting up API Gateway..."
+# 5. API Gateway Setup
+Write-Host "`n[5/6] Setting up API Gateway..."
 $apiResultRaw = aws apigatewayv2 create-api --name "UrbanNoiseAPI-$RANDOM_SUFFIX" --protocol-type HTTP --cors-configuration "AllowOrigins='*',AllowMethods='POST,OPTIONS',AllowHeaders='Content-Type'" --no-cli-pager
 $apiResult = $apiResultRaw | ConvertFrom-Json
 $apiId = $apiResult.ApiId
@@ -75,7 +81,8 @@ aws apigatewayv2 create-route --api-id $apiId --route-key "POST /analyze-noise" 
 
 aws lambda add-permission --function-name $LAMBDA_NAME --statement-id apigateway-invoke --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:$AWS_REGION`:*:$apiId/*/*/analyze-noise" --no-cli-pager
 
-Write-Host "`n[5/5] Updating Frontend Configuration with API URL..."
+# 6. Final Push
+Write-Host "`n[6/6] Updating Frontend Configuration with API URL..."
 $fullApiUrl = "$apiUrl/analyze-noise"
 Write-Host "New API Gateway URL: $fullApiUrl"
 
@@ -88,7 +95,7 @@ Set-Content -Path $analyzerPath -Value $analyzerHtml
 aws s3 cp $analyzerPath "s3://$BUCKET_NAME/analyzer.html" --no-cli-pager
 
 Write-Host "`n============================"
-Write-Host "ALL 5 SERVICES TRULY DEPLOYED SUCCESSFULLY!"
+Write-Host "ALL 6 AWS LOGICAL SERVICES TRULY DEPLOYED SUCCESSFULLY!"
 Write-Host "Public Website URL: http://$BUCKET_NAME.s3-website-$AWS_REGION.amazonaws.com"
 Write-Host "API Gateway Endpoint: $fullApiUrl"
 Write-Host "============================"
