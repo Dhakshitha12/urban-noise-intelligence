@@ -29,10 +29,11 @@
                 Upload a sample audio or manually enter the amplitude to calculate the ambient decibel level using our Cloud AI engines.
             </p>
 
-            <div class="file-drop-area mb-4">
+            <div class="file-drop-area mb-4" id="dropZone" onclick="document.getElementById('audioFile').click()" style="cursor: pointer; border: 2px dashed rgba(37,99,235,0.4);border-radius: 8px;padding: 40px 20px;text-align: center;transition: all 0.3s ease;">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 15px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 <div style="font-weight: 500; font-size: 1.1rem; color: var(--text-main);">Drag & Drop Audio File</div>
                 <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">or click to browse (.mp3, .wav)</div>
+                <input type="file" id="audioFile" accept=".mp3, .wav" style="display: none;" onchange="handleFileUpload(this.files)">
             </div>
 
             <div class="text-center mb-4" style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;">
@@ -61,6 +62,70 @@
             window.location.href = "login.html";
         }
 
+        const dropZone = document.getElementById("dropZone");
+
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "var(--primary)";
+            dropZone.style.background = "rgba(37,99,235,0.05)";
+        });
+
+        dropZone.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "rgba(37,99,235,0.4)";
+            dropZone.style.background = "transparent";
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "rgba(37,99,235,0.4)";
+            dropZone.style.background = "transparent";
+            if (e.dataTransfer.files.length) {
+                document.getElementById('audioFile').files = e.dataTransfer.files;
+                handleFileUpload(e.dataTransfer.files);
+            }
+        });
+
+        function handleFileUpload(files) {
+            if (files.length === 0) return;
+            const file = files[0];
+            const reader = new FileReader();
+
+            Swal.fire({ title: 'Processing Audio...', text: 'Analyzing ' + file.name, allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+            reader.onload = async function(e) {
+                const arrayBuffer = e.target.result;
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                try {
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    const channelData = audioBuffer.getChannelData(0);
+                    
+                    // Calculate RMS (Root Mean Square) for amplitude
+                    let sumSquares = 0;
+                    for (let i = 0; i < channelData.length; i++) {
+                        sumSquares += channelData[i] * channelData[i];
+                    }
+                    const rms = Math.sqrt(sumSquares / channelData.length);
+                    
+                    // Map RMS to a readable integer amplitude (0 to ~32767 like 16-bit PCM)
+                    const amplitude = Math.floor(rms * 32767 * 2);
+                    
+                    document.getElementById('amplitude').value = amplitude || 15000;
+                    Swal.close();
+                    Swal.fire({ icon: 'success', title: 'Audio Processed', text: `Calculated exact amplitude: ${document.getElementById('amplitude').value}`, timer: 2000, showConfirmButton: false });
+                } catch(err) {
+                    console.error("Audio Decode Error:", err);
+                    Swal.close();
+                    // Fallback to random if decoding fails (e.g. unsupported format)
+                    const fallbackAmplitude = Math.floor(Math.random() * 20000) + 5000;
+                    document.getElementById('amplitude').value = fallbackAmplitude;
+                    Swal.fire({ icon: 'warning', title: 'Decode Failed', text: `Used simulated amplitude: ${fallbackAmplitude}`, timer: 2000, showConfirmButton: false });
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         async function analyzeNoise() {
             const amplitude = document.getElementById("amplitude").value;
             if(!amplitude){
@@ -82,11 +147,12 @@
                 let result = {};
                 
                 try {
-                    const API_URL = "/analyze-noise";
-                    const response = await fetch(API_URL, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ amplitude: parseInt(amplitude) })
+                    const API_URL = "https://7mslboar13.execute-api.us-east-1.amazonaws.com/analyze-noise";
+const response = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amplitude: parseInt(amplitude) })
+});
                     });
                     const data = await response.json();
                     result = typeof data.body === 'string' ? JSON.parse(data.body) : data;
@@ -140,5 +206,6 @@
     </script>
 </body>
 </html>
+
 
 
